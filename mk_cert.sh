@@ -61,5 +61,7 @@ rm openssl-ca.extras.cnf
 
 # Remove the text from the start of the file:
 openssl x509 -outform pem -in "$certDir/cert.pem" -out "$certDir/cert.pem"
+# Convert to DER
+openssl x509 -outform der -in "$certDir/cert.pem" -out "$certDir/cert.der"
 
 cat "$certDir/cert.pem" cert.chain.pem > "$certDir/cert.chain.pem"

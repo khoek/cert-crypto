@@ -17,11 +17,11 @@ check_pw_len () {
 
 if [[ $# -ne 4 ]]; then
     echo "Wrong number of parameters, expected 4" >&2
-    echo "Usage: $0 <root slug> <slug> <common name (CN)> <subject alternative name (SAN)>" >&2
+    echo "Usage: $0 <parent slug> <slug> <common name (CN)> <subject alternative name (SAN)>" >&2
     exit 3
 fi
 
-rootSlug=$1
+parentSlug=$1
 certSlug=$2
 certCN=$3
 certSAN=$4
@@ -30,37 +30,39 @@ read -s -p "Password for (NEW) $certSlug/privkey: " userCertPassword
 echo
 check_pw_len ${#userCertPassword}
 
-read -s -p "Password for (OLD) $rootSlug/privkey: " userRootPassword
+read -s -p "Password for (OLD) $parentSlug/privkey: " userParentPassword
 echo
-check_pw_len ${#userRootPassword}
+check_pw_len ${#userParentPassword}
 
 
 
 mkdir -p cas
 mkdir "cas/$certSlug"
-cd "cas/$rootSlug"
+cd "cas/$parentSlug"
 
 certDir=../$certSlug
 
-rootSubjectKeyId=$(openssl x509 -in cert.pem -noout -text | grep -A1 "Subject Key Identifier" | tail -n +2 | xargs)
-#rootPkiId=$rootSubjectKeyId
-rootPkiId=$rootSlug
+parentSubjectKeyId=$(openssl x509 -in cert.pem -noout -text | grep -A1 "Subject Key Identifier" | tail -n +2 | xargs)
+#parentPkiId=$parentSubjectKeyId
+parentPkiId=$parentSlug
 
 cat > openssl-ca.extras.cnf <<EOF
 subjectAltName=$certSAN
-authorityInfoAccess=caIssuers;URI:http://pki.hoek.io/ca/$rootPkiId/crt.der
-crlDistributionPoints=URI:http://pki.hoek.io/ca/$rootPkiId/crl.der
+authorityInfoAccess=caIssuers;URI:http://pki.hoek.io/ca/$parentPkiId/crt.der
+crlDistributionPoints=URI:http://pki.hoek.io/ca/$parentPkiId/crl.der
 EOF
 
 # Note different `-policy`, `-extensions`, and `-reqexts` a non-CA cert.
 
 echo $userCertPassword | openssl req -config $SCRIPT_DIR/openssl-ca.cnf -newkey rsa:4096 -sha512 -passout stdin -keyout "$certDir/privkey.pem" -out "$certDir/csr.pem" -outform PEM -subj "/C=AU/O=hoek.io/CN=$certCN" -extensions extensions_cert_v3_ca_intermediate -reqexts extensions_csr_v3_ca_intermediate
-echo $userRootPassword | openssl ca -batch -config $SCRIPT_DIR/openssl-ca.cnf -passin stdin -days 1825 -policy policy_ca -extensions extensions_cert_v3_ca_intermediate -out "$certDir/cert.pem" -infiles "$certDir/csr.pem"
+echo $userParentPassword | openssl ca -batch -config $SCRIPT_DIR/openssl-ca.cnf -passin stdin -days 1825 -policy policy_ca -extensions extensions_cert_v3_ca_intermediate -out "$certDir/cert.pem" -infiles "$certDir/csr.pem"
 
 rm openssl-ca.extras.cnf
 
 # Remove the text from the start of the file:
 openssl x509 -outform pem -in "$certDir/cert.pem" -out "$certDir/cert.pem"
+# Convert to DER
+openssl x509 -outform der -in "$certDir/cert.pem" -out "$certDir/cert.der"
 
 mkdir "$certDir/newcerts"
 mkdir "$certDir/newcrls"

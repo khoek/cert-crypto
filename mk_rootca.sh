@@ -39,6 +39,8 @@ echo $userPassword | openssl req -x509 -config $SCRIPT_DIR/openssl-ca.cnf -newke
 
 # Remove the text from the start of the file:
 openssl x509 -outform pem -in cert.pem -out cert.pem
+# Convert to DER
+openssl x509 -outform der -in cert.pem -out cert.der
 
 mkdir newcerts
 mkdir newcrls

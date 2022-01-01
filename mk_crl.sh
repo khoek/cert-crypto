@@ -36,8 +36,10 @@ crlnum=$(cat crlnumber)
 # Very weirdly, unlike the similar standard 'serial' file (which we don't use),
 # this file has hex-encoded contents and not decimal, so we decode it when
 # specifying the output file.
-outfile=newcrls/$((16#$crlnum)).crl
-echo $userCaPassword | openssl ca -batch -config $SCRIPT_DIR/openssl-ca.cnf -passin stdin -extensions extensions_crl -out "$outfile" -crldays 365 -gencrl
+outfile_name=newcrls/$((16#$crlnum))
+echo $userCaPassword | openssl ca -batch -config $SCRIPT_DIR/openssl-ca.cnf -passin stdin -extensions extensions_crl -out "$outfile_name.pem" -crldays 365 -gencrl
 
 # Remove the text from the start of the file:
-openssl crl -outform pem -in "$outfile" -out "$outfile"
+openssl crl -outform pem -in "$outfile_name.pem" -out "$outfile_name.pem"
+# Convert to DER
+openssl crl -outform der -in "$outfile_name.pem" -out "$outfile_name.der"
