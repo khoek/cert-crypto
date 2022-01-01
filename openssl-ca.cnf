@@ -1,0 +1,173 @@
+#
+# Copy of default OpenSSL configuration file located at /usr/lib/ssl/openssl.cnf
+#
+
+# This definition stops the following lines choking if HOME isn't
+# defined.
+HOME			= .
+
+# To use this configuration file with the "-extfile" option of the
+# "openssl x509" utility, name here the section containing the
+# X.509v3 extensions to use:
+# extensions		=
+# (Alternatively, use a configuration file that has only
+# X.509v3 extensions in its main [= default] section.)
+
+####################################################################
+
+[ ca ]
+default_ca	= CA_default		# The default ca section
+
+####################################################################
+
+[ CA_default ]
+
+dir		= .             	# Where everything is kept
+certs		= $dir/certs		# Where the issued certs are kept
+database	= $dir/index.txt	# database index file.
+unique_subject	= no			# Set to 'no' to allow creation of
+					# several certs with same subject.
+new_certs_dir	= $dir/newcerts		# default place for new certs.
+
+certificate	= $dir/cert.pem 	# The CA certificate
+rand_serial	= yes			# for random serial numbers
+crlnumber	= $dir/crlnumber	# the current crl number
+					# must be commented out to leave a V1 CRL
+crl		= $dir/crl.pem 		# The current CRL
+private_key	= $dir/privkey.pem      # The private key
+
+# The format used to display the certificate details when asking the user
+# to confirm signing.
+#
+# Comment out the following two lines for the "traditional"
+# (and highly broken) format.
+name_opt 	= ca_default		# Subject Name options
+cert_opt 	= ca_default		# Certificate field options
+
+crl_extensions	= extensions_crl 		# The extensions to add to a CRL
+
+#default_crl_days= 365			# how long before next CRL
+default_md	= sha512
+preserve	= no			# don't keep the passed DN ordering
+
+# Note! These values cherry-picked since they should usually be overriden in command invocations.
+#
+# FIXME REENABLE? if it disables these without a command, so the same thing for the crl_days
+# default_days	= 90				# how long to certify for
+#x509_extensions= extensions_cert_client	# The extensions to add to a cert
+policy		= policy_client
+
+############################################################################################
+
+[ policy_ca ]
+# Any other fields will be silently deleted.
+countryName		= supplied
+organizationName	= supplied
+commonName		= supplied
+
+
+[ policy_client ]
+# Any other fields will be silently deleted.
+countryName		= optional
+organizationName	= supplied
+organizationalUnitName	= optional
+commonName		= supplied
+
+############################################################################################
+
+[ req ]
+default_bits		= 4096
+default_keyfile 	= privkey.pem
+distinguished_name	= req_distinguished_name
+attributes		= req_attributes
+x509_extensions	= invalid_dummy_x509	# Force overriding on the command line with `-extensions <section>`
+req_extensions = invalid_dummy_req 	# Force overriding on the command line with `-reqexts <section>`
+
+string_mask = utf8only
+
+
+[ req_distinguished_name ]
+countryName			= Country Name (2 letter code)
+countryName_default		= AU
+countryName_min			= 2
+countryName_max			= 2
+
+organizationName		= Organization Name
+organizationName_default	= hoek.io
+
+organizationalUnitName		= Organizational Unit Name
+
+commonName			= Common Name
+commonName_max			= 64
+
+
+[ req_attributes ]
+
+############################################################################################
+
+# Extensions to add to a certificate request for the root
+[ extensions_csr_v3_ca_root ]
+
+basicConstraints=CA:TRUE
+keyUsage = cRLSign,keyCertSign
+
+
+# Extensions to add to a certificate request for a CA
+[ extensions_csr_v3_ca_intermediate ]
+
+basicConstraints=CA:TRUE
+keyUsage = digitalSignature,cRLSign,keyCertSign
+extendedKeyUsage=serverAuth,clientAuth
+
+# Extensions to add to a certificate request for a client
+[ extensions_csr_v3_client ]
+
+basicConstraints=CA:FALSE
+keyUsage = digitalSignature,keyEncipherment
+extendedKeyUsage=serverAuth,clientAuth
+
+############################################################################################
+
+# Extensions for a typical root CA
+[ extensions_cert_v3_ca_root ]
+
+subjectKeyIdentifier=hash
+
+basicConstraints=critical,CA:TRUE
+keyUsage=cRLSign,keyCertSign
+
+# Extensions for a typical intermediate CA
+[ extensions_cert_v3_ca_intermediate ]
+
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid:always,issuer
+
+basicConstraints=critical,CA:TRUE
+keyUsage=digitalSignature,cRLSign,keyCertSign
+extendedKeyUsage=serverAuth,clientAuth
+
+.include openssl-ca.extras.cnf
+
+# Extensions for a typical client certificate
+[ extensions_cert_v3_client ]
+
+# PKIX recommendations harmless if included in all certificates.
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid,issuer
+
+# This goes against PKIX guidelines but some CAs do it and some software
+# requires this to avoid interpreting an end user certificate as a CA.
+basicConstraints=CA:FALSE
+keyUsage=digitalSignature,keyEncipherment
+extendedKeyUsage=serverAuth,clientAuth
+
+.include openssl-ca.extras.cnf
+
+############################################################################################
+
+# Extensions to add to CRLs
+[ extensions_crl ]
+
+# Only issuerAltName and authorityKeyIdentifier make any sense in a CRL.
+# issuerAltName=issuer:copy
+authorityKeyIdentifier=keyid:always
