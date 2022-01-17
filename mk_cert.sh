@@ -3,17 +3,7 @@
 set -e
 
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
-
-check_pw_len () {
-  if (($1 >= 4 && $1 <= 1023)); then
-    :
-  else
-    echo "Password must be between 4 and 1023 characters (inclusive)"
-    exit 1
-  fi
-}
-
-
+. "$SCRIPT_DIR"/lib.sh
 
 if [[ $# -ne 4 ]]; then
     echo "Wrong number of parameters, expected 4" >&2
@@ -26,23 +16,23 @@ certSlug=$2
 certDN=$3
 certSAN=$4
 
-read -s -p "Password for (NEW) $certSlug/privkey: " userCertPassword
+read -r -s -p "Password for (NEW) $certSlug/privkey: " userCertPassword
 echo
 check_pw_len ${#userCertPassword}
 
-read -s -p "Password for (OLD) $caSlug/privkey: " userCaPassword
+read -r -s -p "Password for (OLD) $caSlug/privkey: " userCaPassword
 echo
 check_pw_len ${#userCaPassword}
-
-
 
 mkdir -p certs
 mkdir "certs/$certSlug"
 cd "cas/$caSlug"
 
 certDir=../../certs/$certSlug
+certPrivkeyDir=../../privkeys/$certSlug
+parentPrivkeyDir=../../privkeys/$caSlug
 
-caSubjectKeyId=$(openssl x509 -in cert.pem -noout -text | grep -A1 "Subject Key Identifier" | tail -n +2 | xargs)
+#caSubjectKeyId=$(openssl x509 -in cert.pem -noout -text | grep -A1 "Subject Key Identifier" | tail -n +2 | xargs)
 #caPkiId=$caSubjectKeyId
 caPkiId=$caSlug
 
@@ -54,8 +44,9 @@ EOF
 
 # Note different `-policy`, `-extensions`, and `-reqexts` a CA cert.
 
-echo $userCertPassword | openssl req -config $SCRIPT_DIR/openssl-ca.cnf -newkey rsa:4096 -sha512 -passout stdin -keyout "$certDir/privkey.pem" -out "$certDir/csr.pem" -outform PEM -subj "$certDN" -extensions extensions_cert_v3_client -reqexts extensions_csr_v3_client
-echo $userCaPassword | openssl ca -batch -config $SCRIPT_DIR/openssl-ca.cnf -passin stdin -days 1000 -policy policy_client -extensions extensions_cert_v3_client -out "$certDir/cert.pem" -infiles "$certDir/csr.pem"
+(cd ../..; echo "$userCertPassword" | "$SCRIPT_DIR"/mk_privkey.sh "$certSlug")
+echo "$userCertPassword" | openssl req -config "$SCRIPT_DIR"/openssl-ca.cnf -new -key "$certPrivkeyDir/privkey.pem" -sha512 -passin stdin -out "$certDir/csr.pem" -outform PEM -subj "$certDN" -extensions extensions_cert_v3_client -reqexts extensions_csr_v3_client
+echo "$userCaPassword" | openssl ca -batch -config "$SCRIPT_DIR"/openssl-ca.cnf -keyfile "$parentPrivkeyDir/privkey.pem" -passin stdin -days 1000 -policy policy_client -extensions extensions_cert_v3_client -out "$certDir/cert.pem" -infiles "$certDir/csr.pem"
 
 rm openssl-ca.extras.cnf
 

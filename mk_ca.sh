@@ -3,22 +3,12 @@
 set -e
 
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
-
-check_pw_len () {
-  if (($1 >= 4 && $1 <= 1023)); then
-    :
-  else
-    echo "Password must be between 4 and 1023 characters (inclusive)"
-    exit 1
-  fi
-}
-
-
+. "$SCRIPT_DIR"/lib.sh
 
 if [[ $# -ne 4 ]]; then
     echo "Wrong number of parameters, expected 4" >&2
     echo "Usage: $0 <parent slug> <slug> <common name (CN)> <subject alternative name (SAN)>" >&2
-    exit 3
+    exit 2
 fi
 
 parentSlug=$1
@@ -26,23 +16,23 @@ certSlug=$2
 certCN=$3
 certSAN=$4
 
-read -s -p "Password for (NEW) $certSlug/privkey: " userCertPassword
+read -r -s -p "Password for (NEW) $certSlug/privkey: " userCertPassword
 echo
 check_pw_len ${#userCertPassword}
 
-read -s -p "Password for (OLD) $parentSlug/privkey: " userParentPassword
+read -r -s -p "Password for (OLD) $parentSlug/privkey: " userParentPassword
 echo
 check_pw_len ${#userParentPassword}
-
-
 
 mkdir -p cas
 mkdir "cas/$certSlug"
 cd "cas/$parentSlug"
 
 certDir=../$certSlug
+certPrivkeyDir=../../privkeys/$certSlug
+parentPrivkeyDir=../../privkeys/$parentSlug
 
-parentSubjectKeyId=$(openssl x509 -in cert.pem -noout -text | grep -A1 "Subject Key Identifier" | tail -n +2 | xargs)
+#parentSubjectKeyId=$(openssl x509 -in cert.pem -noout -text | grep -A1 "Subject Key Identifier" | tail -n +2 | xargs)
 #parentPkiId=$parentSubjectKeyId
 parentPkiId=$parentSlug
 
@@ -54,8 +44,9 @@ EOF
 
 # Note different `-policy`, `-extensions`, and `-reqexts` a non-CA cert.
 
-echo $userCertPassword | openssl req -config $SCRIPT_DIR/openssl-ca.cnf -newkey rsa:4096 -sha512 -passout stdin -keyout "$certDir/privkey.pem" -out "$certDir/csr.pem" -outform PEM -subj "/C=AU/O=hoek.io/CN=$certCN" -extensions extensions_cert_v3_ca_intermediate -reqexts extensions_csr_v3_ca_intermediate
-echo $userParentPassword | openssl ca -batch -config $SCRIPT_DIR/openssl-ca.cnf -passin stdin -days 1825 -policy policy_ca -extensions extensions_cert_v3_ca_intermediate -out "$certDir/cert.pem" -infiles "$certDir/csr.pem"
+(cd ../..; echo "$userCertPassword" | "$SCRIPT_DIR"/mk_privkey.sh "$certSlug")
+echo "$userCertPassword" | openssl req -config "$SCRIPT_DIR"/openssl-ca.cnf -new -key "$certPrivkeyDir/privkey.pem" -sha512 -passin stdin -out "$certDir/csr.pem" -outform PEM -subj "/C=AU/O=hoek.io/CN=$certCN" -extensions extensions_cert_v3_ca_intermediate -reqexts extensions_csr_v3_ca_intermediate
+echo "$userParentPassword" | openssl ca -batch -config "$SCRIPT_DIR"/openssl-ca.cnf -keyfile "$parentPrivkeyDir/privkey.pem" -passin stdin -days 1825 -policy policy_ca -extensions extensions_cert_v3_ca_intermediate -out "$certDir/cert.pem" -infiles "$certDir/csr.pem"
 
 rm openssl-ca.extras.cnf
 

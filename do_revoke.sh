@@ -3,17 +3,7 @@
 set -e
 
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
-
-check_pw_len () {
-  if (($1 >= 4 && $1 <= 1023)); then
-    :
-  else
-    echo "Password must be between 4 and 1023 characters (inclusive)"
-    exit 1
-  fi
-}
-
-
+. "$SCRIPT_DIR"/lib.sh
 
 if [[ $# -ne 2 ]]; then
     echo "Wrong number of parameters, expected 2" >&2
@@ -25,14 +15,14 @@ caSlug=$1
 prefixedRevokeeSlug=$2
 
 # Test whether a full path was provided (including the 'cas/' or 'certs/') prefix
-cd $prefixedRevokeeSlug
+cd "$prefixedRevokeeSlug"
 cd ../..
 
-read -s -p "Password for (OLD) $caSlug/privkey: " userCaPassword
+parentPrivkeyDir=../../privkeys/$caSlug
+
+read -r -s -p "Password for (OLD) $caSlug/privkey: " userCaPassword
 echo
 check_pw_len ${#userCaPassword}
-
-
 
 cd "cas/$caSlug"
 
@@ -41,4 +31,4 @@ cd "cas/$caSlug"
 # which says "This revocation code is typically used when an individual is terminated or has resigned from an organization.".
 #
 # But just separately might be a fun project!
-echo $userCaPassword | openssl ca -batch -config $SCRIPT_DIR/openssl-ca.cnf -passin stdin -crl_reason affiliationChanged -revoke "../../$prefixedRevokeeSlug/cert.pem"
+echo "$userCaPassword" | openssl ca -batch -config "$SCRIPT_DIR/openssl-ca.cnf" -keyfile "$parentPrivkeyDir/privkey.pem" -passin stdin -crl_reason affiliationChanged -revoke "../../$prefixedRevokeeSlug/cert.pem"
